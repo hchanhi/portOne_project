@@ -2,7 +2,7 @@ function requestPay() {
 
         var IMP = window.IMP;
         IMP.init("imp37173674");
-        const orderNumber = document.getElementById('orderNumber').value;
+        const merchant_uid = document.getElementById('merchant_uid').value;
         const productName = document.getElementById('productName').value;
         const paymentAmount = document.getElementById('paymentAmount').value;
 
@@ -10,7 +10,7 @@ function requestPay() {
             {
                 pg: "nice.nictest00m",
                 pay_method: "card",
-                merchant_uid: orderNumber,
+                merchant_uid: merchant_uid,
                 name: productName,
                 amount: paymentAmount,
                 buyer_email: "Iamport@chai.finance",
@@ -22,21 +22,9 @@ function requestPay() {
             function (rsp) {
                 if (rsp.success) {
                     // 결제 성공 시: 결제 승인 또는 가상계좌 발급에 성공한 경우
-                    alert("결제가 성공적으로 처리되었습니다.");
+                    alert("결제가 성공적으로 처리되었습니다.\n 거래 번호 : " + rsp.imp_uid);
+                    console.log(rsp.imp_uid);
 
-                    // jQuery로 HTTP 요청
-                    // jQuery.ajax({
-                    //     url: "{서버의 결제 정보를 받는 가맹점 endpoint}",
-                    //     method: "POST",
-                    //     headers: { "Content-Type": "application/json" },
-                    //     data: {
-                    //         imp_uid: rsp.imp_uid,            // 결제 고유번호
-                    //         merchant_uid: rsp.merchant_uid   // 주문번호
-                    //     }
-                    // }).done(function (data) {
-                    //     // 가맹점 서버 결제 API 성공시 로직
-                    //     alert("결제가 성공적으로 처리되었습니다.");
-                    // })
                 } else {
                     alert("결제에 실패하였습니다. 에러 내용: " + rsp.error_msg +
                     "거래 번호: " + orderNumber);

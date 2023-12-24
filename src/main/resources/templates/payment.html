@@ -14,7 +14,7 @@
 
 <h1>결제하기</h1>
 <form id="paymentForm" action="#" th:action="@{/api/payment}" th:method="post">
-    <label for="orderNumber">가맹점 주문 번호 </label><input type="text" id="orderNumber" placeholder="가맹점 주문번호를 입력해주세요." /><br>
+    <label for="merchant_uid">가맹점 주문 번호 </label><input type="text" id="merchant_uid" placeholder="가맹점 주문번호를 입력해주세요." /><br>
     <label for="productName">제품명 </label><input type="text" id="productName" placeholder="결제 대상 제품명을 입력해주세요." /><br>
     <label for="paymentAmount">결제 금액 </label><input type="text" id="paymentAmount" placeholder="결제 금액을 입력해주세요." /><br>
     <button type="button" onclick="requestPay()">결제하기</button>
