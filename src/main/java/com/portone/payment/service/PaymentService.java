@@ -5,6 +5,7 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -27,28 +28,29 @@ public class PaymentService {
 
     RestTemplate restTemplate = new RestTemplate();
 
-    public ResponseEntity<Object> getAccessToken() {
+
+    public ResponseEntity<String> getAccessToken() {
         String url = portOneUrl + "/users/getToken";
-        Map<String, String> error = new HashMap<>();
+        HttpComponentsClientHttpRequestFactory factory = new HttpComponentsClientHttpRequestFactory();
+        restTemplate.setRequestFactory(new HttpComponentsClientHttpRequestFactory());
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
-        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-        body.add("imp_key", imp_key);
-        body.add("imp_secret", imp_secret);
+        try {
+            long code;
+            JSONObject Json = null;
+            JSONObject JsonResponse = null;
 
-        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
 
-        ResponseEntity<String> response = null;
-            try {
-                response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
-            } catch (HttpClientErrorException | HttpServerErrorException e) {
-                return ResponseEntity.status(e.getStatusCode()).body(e.getStackTrace());
-            }
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
-        JSONObject Json = null;
-        JSONObject JsonResponse = null;
+            MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+            body.add("imp_key", imp_key);
+            body.add("imp_secret", imp_secret);
+
+            HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+
             try {
                 JSONParser parser = new JSONParser();
                 Json = (JSONObject) parser.parse(String.valueOf(response.getBody()));
@@ -57,31 +59,46 @@ public class PaymentService {
                 e.printStackTrace();
             }
 
-        if (response.getStatusCode().is2xxSuccessful()) {
-            accessToken = (String) JsonResponse.get("access_token");
-            expired_at = (long) JsonResponse.get("expired_at");
-            return ResponseEntity.ok().body(accessToken);
-        } else if(response.getStatusCode().is4xxClientError()){
-            error.put("code", (String) Json.get("code"));
-            error.put("message", (String) Json.get("message"));
-            return ResponseEntity.status(response.getStatusCode()).body(error);
-        } else {
-            error.put("code", "500");
-            error.put("message", "Internal Server Error");
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+            if (response.getStatusCode().is2xxSuccessful()) {
+                code = (long) Json.get("code");
+                if(code == 0){
+                    System.out.println("Access token issue successful");
+                    accessToken = (String) JsonResponse.get("access_token");
+                    expired_at = (long) JsonResponse.get("expired_at");
+                }
+            }
+            return response;
+
+        } catch (HttpClientErrorException | HttpServerErrorException e) {
+            System.out.println("Access token issue failed");
+            return new ResponseEntity<>(e.getResponseBodyAsString(), e.getStatusCode());
+        }catch (Exception e) {
+            System.out.println("Access token issue failed");
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
 
     public ResponseEntity<String> checkPayment(String imp_uid) {
         String url = portOneUrl + "/payments/" + imp_uid;
-        System.out.println(isAccessTokenValid(expired_at));
+        ResponseEntity<String> response = null;
+
         try {
-            if (accessToken == null || !isAccessTokenValid(expired_at)) {
-                getAccessToken();
-                System.out.println("Issue accessToken.");
+            if (accessToken == null) {
+                System.out.println("There is no access token. Issue the access token.");
+                response = getAccessToken();
+                if(!response.getStatusCode().is2xxSuccessful()){
+                    return response;
+                }
+            }
+            else if(!isAccessTokenValid(expired_at)) {
+                System.out.println("Access token expired, reissue the access token.");
+                response = getAccessToken();
+                if(!response.getStatusCode().is2xxSuccessful()){
+                    return response;
+                }
             }else {
-                System.out.println("accessToken is valid.");
+                System.out.println("Access token is valid.");
             }
 
             HttpHeaders headers = new HttpHeaders();
@@ -90,7 +107,7 @@ public class PaymentService {
 
             HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(headers);
 
-            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
+            response = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
 
             return response;
 
@@ -114,7 +131,26 @@ public class PaymentService {
             HttpEntity<Map<String, String>> request = new HttpEntity<>(body, headers);
 
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+            if(response.getStatusCode().is2xxSuccessful()) {
+                JSONObject Json = null;
+                JSONObject JsonResponse = null;
+                long code;
+                try {
+                    JSONParser parser = new JSONParser();
+                    Json = (JSONObject) parser.parse(String.valueOf(response.getBody()));
+                    code = (long) Json.get("code");
 
+                    if(code == 0){
+                        System.out.println("Payment cancellation was successful.");
+                        return response;
+                    }else {
+                        System.out.println("Payment cancellation failed. Please try again.");
+                        return response;
+                    }
+                } catch (ParseException e) {
+                    e.printStackTrace();
+                }
+            }
             return response;
 
         } catch (HttpClientErrorException | HttpServerErrorException e) {
@@ -126,9 +162,13 @@ public class PaymentService {
 
     public boolean isAccessTokenValid(long expired_at) {
         long now = System.currentTimeMillis() / 1000L;
-        long isExpired = expired_at - now;
-        System.out.println("isExpired : " + isExpired);
-        return expired_at > now;
-    }
+        boolean isExpired = expired_at > now;
 
+        if (expired_at == 0) {
+            System.out.println("There is no access token.");
+        } else if (!isExpired) {
+            System.out.println("Access token  is Expired");
+        }
+        return isExpired;
+    }
 }

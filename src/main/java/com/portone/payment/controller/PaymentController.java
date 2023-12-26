@@ -5,12 +5,13 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseBody;
 
-import java.util.HashMap;
 import java.util.Map;
 
 
@@ -46,19 +47,21 @@ public class PaymentController {
                     Json = (JSONObject) parser.parse(String.valueOf(response.getBody()));
                     JsonResponse = (JSONObject) Json.get("response");
                     status = (String) JsonResponse.get("status");
-                    System.out.println("payment status : " + status);
 
                     if(status.equals("paid")){
-                        System.out.println("cancel payments");
+                        System.out.println("Payment status is : " + status);
+                        System.out.println("Try to cancel payment");
                         cancelResponse = paymentService.cancelPayment(imp_uid);
                         return ResponseEntity.ok().body(cancelResponse.getBody());
+                    }else {
+                        System.out.println("payment status is : " + status);
                     }
                 } catch (ParseException e) {
                     e.printStackTrace();
                 }
             return ResponseEntity.ok().body(response.getBody());
         } else {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response.getBody());
+            return ResponseEntity.status(response.getStatusCode()).body(response.getBody());
         }
     }
 }
